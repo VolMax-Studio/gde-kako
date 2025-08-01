@@ -1,39 +1,47 @@
-// src/app/api/generate-video/route.ts
-import { HfInference } from '@huggingface/inference'
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server';
 
-const hf = new HfInference(process.env.HUGGINGFACE_TOKEN)
+let dailyLimit = new Map();
+const MAX_FREE_VIDEOS = 3;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
-export async function POST(request: NextRequest) {
+export async function POST(req: Request) {
+  const { imageBase64, prompt } = await req.json();
+  const userId = "user123"; // Zameni sa stvarnim user ID-om (npr. Supabase)
+
+  if (!dailyLimit.has(userId) || Date.now() - dailyLimit.get(userId).lastReset > DAY_MS) {
+    dailyLimit.set(userId, { count: 0, lastReset: Date.now() });
+  }
+
+  const userData = dailyLimit.get(userId);
+  if (userData.count >= MAX_FREE_VIDEOS) {
+    return NextResponse.json({ success: false, error: "Limit od 3 videa dnevno premašen. Nadogradi na Pro!" }, { status: 403 });
+  }
+
   try {
-    const { prompt, imageBase64 } = await request.json()
-    
-    // Mochi-1 integration
-    const videoBlob = await hf.textToVideo({
-      model: 'genmo/mochi-1-preview',
-      inputs: `${prompt}. Professional high-quality animation. Serbian business branding.`,
-      parameters: {
-        duration: 5,
-        fps: 30,
-        resolution: "480p"
-      }
-    })
-    
-    // Convert to base64 for frontend
-    const arrayBuffer = await videoBlob.arrayBuffer()
-    const base64Video = Buffer.from(arrayBuffer).toString('base64')
-    
-    return NextResponse.json({ 
-      success: true, 
-      videoData: `data:video/mp4;base64,${base64Video}`,
-      message: "Video uspešno generisan!"
-    })
-    
+    const response = await fetch('https://api-inference.huggingface.co/models/genmo/mochi-1-preview', {
+      headers: {
+        'Authorization': `Bearer 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`,
+        'Content-Type': 'application/json',
+      },
+      method: 'POST',
+      body: JSON.stringify({
+        inputs: `${prompt}. Professional Serbian animation, 480p, 5 seconds.`,
+        parameters: { num_frames: 150, fps: 30, height: 480, width: 848 },
+      }),
+    });
+
+    if (!response.ok) throw new Error('Greška sa Hugging Face API-jem');
+
+    const videoBlob = await response.blob();
+    const arrayBuffer = await videoBlob.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    // Simulacija S3 URL-a (za sada lokalni)
+    const videoUrl = `/api/video/${Date.now()}.mp4`; // Zameni sa S3 URL-om
+    userData.count += 1;
+    return NextResponse.json({ success: true, videoUrl });
   } catch (error) {
-    console.error('AI Video Generation Error:', error)
-    return NextResponse.json({ 
-      success: false, 
-      error: 'Greška pri generisanju videa. Pokušajte ponovo.' 
-    }, { status: 500 })
+    console.error('Greška:', error);
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
