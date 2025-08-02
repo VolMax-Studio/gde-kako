@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function VideoGenerator() {
   const [image, setImage] = useState<File | null>(null);
@@ -7,6 +7,7 @@ export default function VideoGenerator() {
   const [video, setVideo] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [timeElapsed, setTimeElapsed] = useState(0);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -27,6 +28,7 @@ export default function VideoGenerator() {
     }
     setLoading(true);
     setError(null);
+    setTimeElapsed(0);
 
     try {
       const response = await fetch('/api/generate-video', {
@@ -43,6 +45,17 @@ export default function VideoGenerator() {
       setLoading(false);
     }
   };
+
+  // Tajmer za praćenje vremena
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (loading) {
+      timer = setInterval(() => {
+        setTimeElapsed((prev) => prev + 1);
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [loading]);
 
   return (
     <div className="max-w-4xl mx-auto p-6 bg-gray-800 text-white rounded-lg">
@@ -66,7 +79,7 @@ export default function VideoGenerator() {
         disabled={loading}
         className="w-full bg-blue-600 hover:bg-blue-700 p-3 rounded disabled:opacity-50"
       >
-        {loading ? 'Generiše...' : 'Generiši Video'}
+        {loading ? `Generiše... (${timeElapsed}s)` : 'Generiši Video'}
       </button>
       {error && <p className="text-red-500 mt-2">{error}</p>}
       {video && (
