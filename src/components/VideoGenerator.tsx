@@ -1,56 +1,56 @@
-'use client'
-import { useState } from 'react'
+'use client';
+import { useState } from 'react';
 
 export default function VideoGenerator() {
-  const [image, setImage] = useState<File | null>(null)
-  const [prompt, setPrompt] = useState('VolMax logo 3D rotation')
-  const [video, setVideo] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [image, setImage] = useState<File | null>(null);
+  const [prompt, setPrompt] = useState('VolMax logo 3D rotation');
+  const [video, setVideo] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) setImage(e.target.files[0])
-  }
-
-  const convertToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve) => {
-      const reader = new FileReader()
-      reader.onload = () => resolve(reader.result as string)
-      reader.readAsDataURL(file)
-    })
-  }
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      if (file.size > 5 * 1024 * 1024) {
+        setError('Slika ne sme biti veća od 5MB.');
+        return;
+      }
+      setImage(file);
+      setError(null);
+    }
+  };
 
   const generateVideo = async () => {
-    if (!image) {
-      setError('Izaberite sliku!')
-      return
+    if (!prompt) {
+      setError('Unesite opis animacije!');
+      return;
     }
-    setLoading(true)
-    setError(null)
+    setLoading(true);
+    setError(null);
 
     try {
-      const imageBase64 = await convertToBase64(image)
       const response = await fetch('/api/generate-video', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64, prompt }),
-      })
-      const result = await response.json()
-      if (result.success) setVideo(result.videoUrl)
-      else throw new Error(result.error || 'Greška')
+        body: JSON.stringify({ prompt }),
+      });
+      const result = await response.json();
+      if (result.success) setVideo(result.videoUrl);
+      else throw new Error(result.error || 'Greška');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Greška')
+      setError(err instanceof Error ? err.message : 'Greška');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   return (
     <div className="max-w-4xl mx-auto p-6 bg-gray-800 text-white rounded-lg">
       <h2 className="text-3xl font-bold mb-6 text-center">AI Video Generator</h2>
       <div className="mb-4">
-        <label className="block mb-2">Izaberite sliku:</label>
-        <input type="file" onChange={handleImageUpload} className="w-full p-2 bg-gray-700 rounded" />
+        <label className="block mb-2">Izaberite sliku (opciono):</label>
+        <input type="file" accept="image/*" onChange={handleImageUpload} className="w-full p-2 bg-gray-700 rounded" />
+        {image && <p className="text-green-400 mt-2">Slika: {image.name}</p>}
       </div>
       <div className="mb-4">
         <label className="block mb-2">Opišite animaciju:</label>
@@ -75,5 +75,5 @@ export default function VideoGenerator() {
         </div>
       )}
     </div>
-  )
+  );
 }
